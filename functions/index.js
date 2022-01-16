@@ -47,33 +47,30 @@ const stripe = new Stripe(functions.config().stripe.secret, {
 const app = express()
 const endpointSecret = functions.config().stripe.webhooksecret
 
-// Note: The example code provided by Stripe did not work
-// So used this instead: https://stackoverflow.com/questions/53899365/stripe-error-no-signatures-found-matching-the-expected-signature-for-payload/
+// Note: The example code provided by Stripe did not work So used this instead
+// Taken from https://stackoverflow.com/questions/53899365/stripe-error-no-signatures-found-matching-the-expected-signature-for-payload/
 app.use(bodyParser.json({
-    verify: function (req, res, buf) {
-        var url = req.originalUrl;
-        if (url.startsWith('/webhook')) {
-            req.rawBody = buf.toString()
-        }
-    }
-}));
+  verify: (req, res, buf) => { req.rawBody = buf.toString() }
+}))
 
 app.post('/webhook', async (req, res) => {
-    let sig = req.headers["stripe-signature"];
+  let sig = req.headers["stripe-signature"];
 
-    try {
-        let event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+  try {
+    let event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
 
-        await admin.firestore().collection('payments').add({
-          date: new Date,
-        })
+    // Record the payment in Firestore
+    // NOTE: There is no information about the payer
+    await admin.firestore().collection('payments').add({
+      date: new Date,
+    })
 
-        res.status(200).end()
-    }
-    catch (err) {
-        console.log(err);
-        res.status(400).end()
-    }
+    res.status(200).end()
+  }
+  catch (err) {
+      console.log(err);
+      res.status(400).end()
+  }
 });
 
 
