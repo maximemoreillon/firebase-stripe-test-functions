@@ -22,12 +22,26 @@ const { Logging } = require('@google-cloud/logging');
 
 admin.initializeApp();
 
+
 const logging = new Logging({
   projectId: process.env.GCLOUD_PROJECT,
 });
 
 const stripe = new Stripe(functions.config().stripe.secret, {
   apiVersion: '2020-08-27',
+});
+
+
+// The basic hello world function
+exports.helloWorld = functions.https.onRequest((request, response) => {
+  functions.logger.info("Hello logs!", {structuredData: true});
+  response.send("Hello from Firebase!");
+});
+
+
+// Webhook for Stripe checkout
+exports.stripeWebhook = functions.https.onRequest((request, response) => {
+  response.send("Endpoint for Stripe Webhooks!");
 });
 
 /**
@@ -110,7 +124,8 @@ exports.createStripePayment = functions.firestore
       );
       // If the result is successful, write it back to the database.
       await snap.ref.set(payment);
-    } catch (error) {
+    }
+    catch (error) {
       // We want to capture errors and render them in a user-friendly way, while
       // still logging an exception with StackDriver
       functions.logger.log(error);
