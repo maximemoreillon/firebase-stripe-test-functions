@@ -58,14 +58,17 @@ app.use(bodyParser.json({
     }
 }));
 
-app.post('/webhook', (req, res) => {
+app.post('/webhook', async (req, res) => {
     let sig = req.headers["stripe-signature"];
 
     try {
         let event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
-        res.status(200).end()
 
-        // Do something with event
+        await admin.firestore().collection('payments').add({
+          date: new Date,
+        })
+
+        res.status(200).end()
     }
     catch (err) {
         console.log(err);
