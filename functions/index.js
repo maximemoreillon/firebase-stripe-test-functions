@@ -19,6 +19,9 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { Stripe } = require('stripe');
 const { Logging } = require('@google-cloud/logging');
+const express = require('express')
+const bodyParser = require('body-parser');
+
 
 admin.initializeApp();
 
@@ -33,16 +36,48 @@ const stripe = new Stripe(functions.config().stripe.secret, {
 
 
 // The basic hello world function
-exports.helloWorld = functions.https.onRequest((request, response) => {
-  functions.logger.info("Hello logs!", {structuredData: true});
-  response.send("Hello from Firebase!");
-});
+// exports.helloWorld = functions.https.onRequest((request, response) => {
+//   functions.logger.info("Hello logs!", {structuredData: true});
+//   response.send("Hello from Firebase!");
+// });
 
 
 // Webhook for Stripe checkout
-exports.stripeWebhook = functions.https.onRequest((request, response) => {
-  response.send("Endpoint for Stripe Webhooks!");
+
+const app = express()
+const endpointSecret = functions.config().stripe.webhooksecret
+
+// Note: The example code provided by Stripe did not work
+// So used this instead: https://stackoverflow.com/questions/53899365/stripe-error-no-signatures-found-matching-the-expected-signature-for-payload/
+app.use(bodyParser.json({
+    verify: function (req, res, buf) {
+        var url = req.originalUrl;
+        if (url.startsWith('/webhook')) {
+            req.rawBody = buf.toString()
+        }
+    }
+}));
+
+app.post('/webhook', (req, res) => {
+    let sig = req.headers["stripe-signature"];
+
+    try {
+        let event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
+        res.status(200).end()
+
+        // Do something with event
+    }
+    catch (err) {
+        console.log(err);
+        res.status(400).end()
+    }
 });
+
+
+exports.app = functions.https.onRequest(app);
+
+
+
 
 /**
  * When a user is created, create a Stripe customer object for them.
