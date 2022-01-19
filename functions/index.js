@@ -20,6 +20,7 @@ const admin = require('firebase-admin');
 const { Stripe } = require('stripe');
 const { Logging } = require('@google-cloud/logging');
 const express = require('express')
+const cors = require('cors')
 const bodyParser = require('body-parser');
 
 
@@ -45,7 +46,9 @@ const stripe = new Stripe(functions.config().stripe.secret, {
 // Webhook for Stripe checkout
 
 const app = express()
-const endpointSecret = functions.config().stripe.webhooksecret
+
+app.use(cors({ origin: true }));
+
 
 // Note: The example code provided by Stripe did not work So used this instead
 // Taken from https://stackoverflow.com/questions/53899365/stripe-error-no-signatures-found-matching-the-expected-signature-for-payload/
@@ -53,10 +56,14 @@ app.use(bodyParser.json({
   verify: (req, res, buf) => { req.rawBody = buf.toString() }
 }))
 
+
+
 app.post('/webhook', async (req, res) => {
   let sig = req.headers["stripe-signature"];
 
   try {
+    const endpointSecret = functions.config().stripe.webhooksecret
+
     let event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
 
     // Record the payment in Firestore
@@ -71,6 +78,23 @@ app.post('/webhook', async (req, res) => {
       console.log(err);
       res.status(400).end()
   }
+})
+
+app.post("/intent", async (req, res) => {
+  const { items } = req.body;
+
+  // Create a PaymentIntent with the order amount and currency
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: 1000,
+    currency: "jpy",
+    automatic_payment_methods: {
+      enabled: true,
+    },
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
 });
 
 
